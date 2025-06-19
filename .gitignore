@@ -1,0 +1,6 @@
+armonite
+.idea
+armonite.db
+results
+ui-build
+ui-react/node_modules

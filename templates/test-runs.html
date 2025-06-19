@@ -1,0 +1,201 @@
+{{define "test-runs-content"}}
+<div class="header">
+    <h1>Test Runs</h1>
+    <p>Create and manage load test executions</p>
+</div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>Test Runs</h2>
+        <button onclick="showCreateForm()" class="btn">Create New Test Run</button>
+    </div>
+    
+    <div id="test-runs-list">
+        <p>Loading test runs...</p>
+    </div>
+</div>
+
+<!-- Create Test Run Modal -->
+<div id="create-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90%; overflow-y: auto;">
+        <h2 style="margin-bottom: 20px;">Create New Test Run</h2>
+        
+        <form id="create-form">
+            <div class="form-group">
+                <label class="form-label">Test Name</label>
+                <input type="text" class="form-input" id="test-name" placeholder="My Load Test" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Minimum Agents</label>
+                <input type="number" class="form-input" id="min-agents" value="1" min="1" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Test Plan</label>
+                <textarea class="form-input" id="test-plan" rows="15" placeholder="Enter test plan JSON..." required>{
+  "name": "Sample Test",
+  "duration": "60s",
+  "concurrency": 10,
+  "endpoints": [
+    {
+      "method": "GET",
+      "url": "https://httpbin.org/get",
+      "headers": {
+        "User-Agent": "Armonite-LoadTester/1.0"
+      },
+      "think_time": "1s"
+    }
+  ]
+}</textarea>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" onclick="hideCreateForm()" class="btn btn-outline">Cancel</button>
+                <button type="submit" class="btn">Create Test Run</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    async function refreshData() {
+        // Show loading state first
+        document.getElementById('test-runs-list').innerHTML = '<p>Loading test runs...</p>';
+        
+        try {
+            const testRuns = await apiCall('/test-runs');
+            
+            if (testRuns.test_runs && testRuns.test_runs.length > 0) {
+                let testsHtml = `
+                    <table class="table">
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Started</th>
+                            <th>Duration</th>
+                            <th>Min Agents</th>
+                            <th>Actions</th>
+                        </tr>
+                `;
+                
+                testRuns.test_runs.forEach(test => {
+                    const canStart = test.status === 'created';
+                    const canStop = test.status === 'running' || test.status === 'waiting_for_agents';
+                    const canDelete = test.status === 'completed' || test.status === 'failed' || test.status === 'cancelled';
+                    
+                    testsHtml += `
+                        <tr>
+                            <td>
+                                <strong>${test.name}</strong><br>
+                                <small><code>${test.id}</code></small>
+                            </td>
+                            <td><span class="status status-${test.status}">${test.status.replace('_', ' ')}</span></td>
+                            <td>${formatTimestamp(test.created_at)}</td>
+                            <td>${test.started_at ? formatTimestamp(test.started_at) : 'N/A'}</td>
+                            <td>${test.duration || 'N/A'}</td>
+                            <td>${test.agent_count}</td>
+                            <td>
+                                <div style="display: flex; gap: 8px;">
+                                    <button onclick="viewTestRun('${test.id}')" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;">View</button>
+                                    ${canStart ? `<button onclick="startTestRun('${test.id}')" class="btn" style="padding: 6px 12px; font-size: 12px;">Start</button>` : ''}
+                                    ${canStop ? `<button onclick="stopTestRun('${test.id}')" class="btn" style="padding: 6px 12px; font-size: 12px;">Stop</button>` : ''}
+                                    ${canDelete ? `<button onclick="deleteTestRun('${test.id}')" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;">Delete</button>` : ''}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                testsHtml += '</table>';
+                document.getElementById('test-runs-list').innerHTML = testsHtml;
+            } else {
+                document.getElementById('test-runs-list').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <p style="font-size: 18px; margin-bottom: 16px;">No test runs created yet</p>
+                        <p>Create your first test run to begin load testing.</p>
+                    </div>
+                `;
+            }
+            
+        } catch (error) {
+            console.error('Failed to refresh test runs:', error);
+            document.getElementById('test-runs-list').innerHTML = '<p style="color: #666;">Unable to load test runs data</p>';
+        }
+    }
+
+    function showCreateForm() {
+        document.getElementById('create-modal').style.display = 'block';
+    }
+
+    function hideCreateForm() {
+        document.getElementById('create-modal').style.display = 'none';
+    }
+
+    document.getElementById('create-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        try {
+            const testPlan = JSON.parse(document.getElementById('test-plan').value);
+            
+            const payload = {
+                name: document.getElementById('test-name').value,
+                min_agents: parseInt(document.getElementById('min-agents').value),
+                test_plan: testPlan
+            };
+            
+            const result = await apiCall('/test-runs', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            
+            hideCreateForm();
+            refreshData();
+            alert('Test run created successfully!');
+            
+        } catch (error) {
+            alert('Failed to create test run: ' + error.message);
+        }
+    });
+
+    async function startTestRun(id) {
+        try {
+            await apiCall(`/test-runs/${id}/start`, { method: 'POST' });
+            refreshData();
+            alert('Test run started!');
+        } catch (error) {
+            alert('Failed to start test run: ' + error.message);
+        }
+    }
+
+    async function stopTestRun(id) {
+        try {
+            await apiCall(`/test-runs/${id}/stop`, { method: 'POST' });
+            refreshData();
+            alert('Test run stop initiated!');
+        } catch (error) {
+            alert('Failed to stop test run: ' + error.message);
+        }
+    }
+
+    async function deleteTestRun(id) {
+        if (!confirm('Are you sure you want to delete this test run?')) return;
+        
+        try {
+            await apiCall(`/test-runs/${id}`, { method: 'DELETE' });
+            refreshData();
+            alert('Test run deleted!');
+        } catch (error) {
+            alert('Failed to delete test run: ' + error.message);
+        }
+    }
+
+    function viewTestRun(id) {
+        window.location.href = `/ui/test-runs/${id}`;
+    }
+
+    // Initial load
+    refreshData();
+</script>
+{{end}}

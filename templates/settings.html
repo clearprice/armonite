@@ -1,0 +1,95 @@
+{{define "settings-content"}}
+<div class="header">
+    <h1>Settings</h1>
+    <p>Configure your Armonite coordinator settings</p>
+</div>
+
+<div class="card">
+    <h2>Coordinator Configuration</h2>
+    <div id="coordinator-config">
+        <p>Loading configuration...</p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>API Information</h2>
+    <p>Use these endpoints to integrate with Armonite programmatically:</p>
+    
+    <div style="margin: 20px 0;">
+        <h3>Coordinator Status</h3>
+        <div class="code">GET /api/v1/status</div>
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <h3>Agent Management</h3>
+        <div class="code">GET /api/v1/agents</div>
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <h3>Test Run Management</h3>
+        <div class="code">POST /api/v1/test-runs
+GET /api/v1/test-runs
+GET /api/v1/test-runs/{id}
+POST /api/v1/test-runs/{id}/start
+POST /api/v1/test-runs/{id}/stop
+DELETE /api/v1/test-runs/{id}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Example API Usage</h2>
+    <p>Create a test run via API:</p>
+    <div class="code">curl -X POST http://{{.Host}}:{{.HTTPPort}}/api/v1/test-runs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My API Test",
+    "min_agents": 2,
+    "test_plan": {
+      "name": "API Load Test",
+      "duration": "60s",
+      "concurrency": 50,
+      "endpoints": [
+        {
+          "method": "GET",
+          "url": "https://httpbin.org/get",
+          "headers": {
+            "User-Agent": "Armonite-LoadTester/1.0"
+          },
+          "think_time": "1s"
+        }
+      ]
+    }
+  }'</div>
+    
+    <p style="margin-top: 20px;">Start the test run:</p>
+    <div class="code">curl -X POST http://{{.Host}}:{{.HTTPPort}}/api/v1/test-runs/{test-run-id}/start</div>
+</div>
+
+<script>
+    async function refreshData() {
+        try {
+            const status = await apiCall('/status');
+            
+            document.getElementById('coordinator-config').innerHTML = `
+                <table class="table">
+                    <tr><td><strong>Service</strong></td><td>${status.service}</td></tr>
+                    <tr><td><strong>Status</strong></td><td><span class="status status-${status.status}">${status.status}</span></td></tr>
+                    <tr><td><strong>Host</strong></td><td>${status.host}</td></tr>
+                    <tr><td><strong>NATS Port</strong></td><td>${status.nats_port}</td></tr>
+                    <tr><td><strong>HTTP Port</strong></td><td>${status.http_port}</td></tr>
+                    <tr><td><strong>Uptime</strong></td><td>${status.uptime}</td></tr>
+                    <tr><td><strong>Connected Agents</strong></td><td>${status.connected_agents}</td></tr>
+                    <tr><td><strong>Total Test Runs</strong></td><td>${status.total_test_runs}</td></tr>
+                </table>
+            `;
+            
+        } catch (error) {
+            console.error('Failed to refresh settings:', error);
+            document.getElementById('coordinator-config').innerHTML = '<p style="color: red;">Failed to load configuration</p>';
+        }
+    }
+
+    // Initial load
+    refreshData();
+</script>
+{{end}}

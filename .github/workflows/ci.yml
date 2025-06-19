@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Node.js dependencies
+        run: |
+          cd ui-react
+          npm ci
+
+      - name: Lint React code
+        run: |
+          cd ui-react
+          npm run lint || true  # Don't fail CI if linting issues exist
+
+      - name: Build React UI
+        run: |
+          cd ui-react
+          npm run build
+
+      - name: Run Go tests
+        run: go test -v ./...
+
+      - name: Run Go vet
+        run: go vet ./...
+
+      - name: Check Go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: Build binary
+        run: go build -o armonite
+
+      - name: Test version command
+        run: ./armonite version
+
+  build:
+    name: Build test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Node.js dependencies
+        run: |
+          cd ui-react
+          npm ci
+
+      - name: Build React UI
+        run: |
+          cd ui-react
+          npm run build
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            go build -o armonite.exe
+          else
+            go build -o armonite
+          fi

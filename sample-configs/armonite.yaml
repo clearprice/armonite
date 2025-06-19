@@ -1,0 +1,25 @@
+server:
+    host: 0.0.0.0
+    port: 4222      # Internal NATS communication port  
+    http_port: 8080 # Public HTTP API and web interface port
+    enable_ui: true # Enable built-in web UI
+database:
+    dsn: "./armonite.db"  # SQLite database file path
+    max_open: 25           # Maximum open connections
+    max_idle: 5            # Maximum idle connections
+    max_lifetime: "1h"     # Connection maximum lifetime
+logging:
+    level: info
+    format: json
+    file: ""
+output:
+    directory: ./results
+    formats:
+        - json
+    filename: armonite-results
+defaults:
+    concurrency: 100
+    duration: 1m
+    broadcast_interval: 5s
+    telemetry_interval: 5s
+    keep_alive: true

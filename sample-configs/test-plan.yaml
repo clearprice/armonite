@@ -1,0 +1,19 @@
+name: "Registration Test Plan"
+duration: "30s"
+concurrency: 2
+ramp_up: "5s"
+endpoints:
+  - method: "GET"
+    url: "https://httpbin.org/get"
+    headers:
+      User-Agent: "Armonite-LoadTester/1.0"
+    think_time: "100ms"
+  - method: "POST"
+    url: "https://httpbin.org/post"
+    headers:
+      Content-Type: "application/json"
+      User-Agent: "Armonite-LoadTester/1.0"
+    body:
+      test: "data"
+      timestamp: "2024-01-01T00:00:00Z"
+    think_time: "200ms"

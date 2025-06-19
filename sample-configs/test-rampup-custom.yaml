@@ -1,0 +1,21 @@
+name: "API Load Test with Custom Phases"
+duration: "3m"
+concurrency: 100
+ramp_up_strategy:
+  type: "custom"
+  duration: "60s"
+  phases:
+    - duration: "20s"
+      concurrency: 25
+      mode: "parallel"
+    - duration: "20s"
+      concurrency: 50
+      mode: "parallel"
+    - duration: "20s"
+      concurrency: 100
+      mode: "parallel"
+endpoints:
+  - method: "GET"
+    url: "https://httpbin.org/get"
+    headers:
+      Content-Type: "application/json"

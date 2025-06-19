@@ -1,0 +1,121 @@
+{{define "results-content"}}
+<div class="header">
+    <h1>Results</h1>
+    <p>View and analyze test results across all test runs</p>
+</div>
+
+<div class="card">
+    <h2>Completed Test Runs</h2>
+    <div id="results-list">
+        <p>Loading results...</p>
+    </div>
+</div>
+
+<script>
+    async function refreshData() {
+        // Show loading state first
+        document.getElementById('results-list').innerHTML = '<p>Loading results data...</p>';
+        
+        try {
+            const testRuns = await apiCall('/test-runs');
+            
+            if (testRuns.test_runs && testRuns.test_runs.length > 0) {
+                const completedTests = testRuns.test_runs.filter(test => 
+                    test.status === 'completed' && test.results
+                );
+                
+                if (completedTests.length > 0) {
+                    let resultsHtml = `
+                        <table class="table">
+                            <tr>
+                                <th>Test Name</th>
+                                <th>Completed</th>
+                                <th>Duration</th>
+                                <th>Total Requests</th>
+                                <th>Errors</th>
+                                <th>Success Rate</th>
+                                <th>Avg Latency</th>
+                                <th>RPS</th>
+                                <th>Actions</th>
+                            </tr>
+                    `;
+                    
+                    completedTests.forEach(test => {
+                        const results = test.results;
+                        resultsHtml += `
+                            <tr>
+                                <td>
+                                    <strong>${test.name}</strong><br>
+                                    <small><code>${test.id}</code></small>
+                                </td>
+                                <td>${formatTimestamp(test.completed_at)}</td>
+                                <td>${test.duration}</td>
+                                <td>${results.total_requests.toLocaleString()}</td>
+                                <td>${results.total_errors.toLocaleString()}</td>
+                                <td>${results.success_rate.toFixed(1)}%</td>
+                                <td>${results.avg_latency_ms.toFixed(1)}ms</td>
+                                <td>${results.requests_per_sec ? results.requests_per_sec.toFixed(1) : 'N/A'}</td>
+                                <td>
+                                    <a href="/ui/test-runs/${test.id}" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;">View Details</a>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    resultsHtml += '</table>';
+                    
+                    // Add summary stats
+                    const totalRequests = completedTests.reduce((sum, test) => sum + test.results.total_requests, 0);
+                    const totalErrors = completedTests.reduce((sum, test) => sum + test.results.total_errors, 0);
+                    const avgSuccessRate = completedTests.reduce((sum, test) => sum + test.results.success_rate, 0) / completedTests.length;
+                    const avgLatency = completedTests.reduce((sum, test) => sum + test.results.avg_latency_ms, 0) / completedTests.length;
+                    
+                    resultsHtml = `
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px;">
+                            <div style="text-align: center; padding: 16px; background-color: #f5f5f5; border-radius: 4px;">
+                                <div style="font-size: 24px; font-weight: 600;">${completedTests.length}</div>
+                                <div style="color: #666;">Completed Tests</div>
+                            </div>
+                            <div style="text-align: center; padding: 16px; background-color: #f5f5f5; border-radius: 4px;">
+                                <div style="font-size: 24px; font-weight: 600;">${totalRequests.toLocaleString()}</div>
+                                <div style="color: #666;">Total Requests</div>
+                            </div>
+                            <div style="text-align: center; padding: 16px; background-color: #f5f5f5; border-radius: 4px;">
+                                <div style="font-size: 24px; font-weight: 600;">${avgSuccessRate.toFixed(1)}%</div>
+                                <div style="color: #666;">Avg Success Rate</div>
+                            </div>
+                            <div style="text-align: center; padding: 16px; background-color: #f5f5f5; border-radius: 4px;">
+                                <div style="font-size: 24px; font-weight: 600;">${avgLatency.toFixed(1)}ms</div>
+                                <div style="color: #666;">Avg Latency</div>
+                            </div>
+                        </div>
+                    ` + resultsHtml;
+                    
+                    document.getElementById('results-list').innerHTML = resultsHtml;
+                } else {
+                    document.getElementById('results-list').innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <p style="font-size: 18px; margin-bottom: 16px;">No completed test runs with results</p>
+                            <p>Complete some test runs to see results here.</p>
+                        </div>
+                    `;
+                }
+            } else {
+                document.getElementById('results-list').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <p style="font-size: 18px; margin-bottom: 16px;">No test runs found</p>
+                        <p><a href="/ui/test-runs">Create a test run</a> to get started.</p>
+                    </div>
+                `;
+            }
+            
+        } catch (error) {
+            console.error('Failed to refresh results:', error);
+            document.getElementById('results-list').innerHTML = '<p style="color: #666;">Unable to load results data</p>';
+        }
+    }
+
+    // Initial load
+    refreshData();
+</script>
+{{end}}

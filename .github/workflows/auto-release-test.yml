@@ -1,0 +1,40 @@
+name: Test Auto Release
+
+on:
+  workflow_dispatch:  # Manual trigger for testing
+
+jobs:
+  test-versioning:
+    name: Test version creation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test version logic
+        run: |
+          echo "Testing version logic..."
+          
+          # Get the latest tag, default to v0.0.0 if no tags exist
+          latest_tag=$(git tag -l "v*.*.*" | sort -V | tail -n1)
+          if [ -z "$latest_tag" ]; then
+            latest_tag="v0.0.0"
+          fi
+          
+          echo "Latest tag: $latest_tag"
+          
+          # Extract version numbers
+          version=${latest_tag#v}
+          IFS='.' read -r major minor patch <<< "$version"
+          
+          # Increment patch version for main branch merges
+          new_patch=$((patch + 1))
+          new_version="v${major}.${minor}.${new_patch}"
+          
+          echo "New version would be: $new_version"
+          
+          # Test the version command
+          go build -ldflags="-X main.version=$new_version" -o armonite-test
+          ./armonite-test version

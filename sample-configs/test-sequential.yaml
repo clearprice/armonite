@@ -1,0 +1,28 @@
+name: "Sequential Coordination Test"
+duration: "2m"
+concurrency: 10
+ramp_up_strategy:
+  type: "custom"
+  duration: "1m"
+  phases:
+    - duration: "20s"
+      concurrency: 3
+      mode: "sequential"
+    - duration: "20s" 
+      concurrency: 6
+      mode: "parallel"
+    - duration: "20s"
+      concurrency: 10
+      mode: "sequential"
+endpoints:
+  - method: "GET"
+    url: "https://httpbin.org/get"
+    headers:
+      User-Agent: "Armonite Load Tester"
+  - method: "POST"
+    url: "https://httpbin.org/post"
+    headers:
+      Content-Type: "application/json"
+    body:
+      test: "sequential coordination"
+      timestamp: "{{now}}"

@@ -1,0 +1,29 @@
+# Ignore build artifacts
+armonite
+dist/
+
+# Ignore UI build (will be built in Docker)
+ui-build/
+ui-react/node_modules/
+ui-react/dist/
+
+# Ignore development files
+.git/
+.gitignore
+README.md
+Makefile
+.env*
+
+# Ignore test files
+*_test.go
+results/
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db

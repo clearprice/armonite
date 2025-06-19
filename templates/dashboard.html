@@ -1,0 +1,132 @@
+{{define "dashboard-content"}}
+<div class="header">
+    <h1>Dashboard</h1>
+    <p>Overview of your distributed load testing environment</p>
+</div>
+
+<div class="card">
+    <h2>Coordinator Status</h2>
+    <div id="coordinator-status">
+        <p>Loading...</p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Quick Actions</h2>
+    <div style="display: flex; gap: 16px; margin-top: 16px;">
+        <a href="/ui/test-runs/new" class="btn">Create Test Run</a>
+        <a href="/ui/agents" class="btn btn-outline">View Agents</a>
+        <a href="/ui/results" class="btn btn-outline">View Results</a>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <div class="card">
+        <h2>Connected Agents</h2>
+        <div id="agents-summary">
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Current Test Run</h2>
+        <div id="current-test">
+            <p>No active test run</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Recent Test Runs</h2>
+    <div id="recent-tests">
+        <p>Loading...</p>
+    </div>
+</div>
+
+<script>
+    async function refreshData() {
+        // Show loading states first
+        document.getElementById('coordinator-status').innerHTML = '<p>Loading coordinator status...</p>';
+        document.getElementById('agents-summary').innerHTML = '<p>Loading agents data...</p>';
+        document.getElementById('recent-tests').innerHTML = '<p>Loading test runs...</p>';
+        
+        try {
+            // Get coordinator status
+            const status = await apiCall('/status');
+            document.getElementById('coordinator-status').innerHTML = `
+                <table class="table">
+                    <tr><td><strong>Status</strong></td><td>${status.status}</td></tr>
+                    <tr><td><strong>Uptime</strong></td><td>${status.uptime}</td></tr>
+                    <tr><td><strong>Connected Agents</strong></td><td>${status.connected_agents}</td></tr>
+                    <tr><td><strong>Total Test Runs</strong></td><td>${status.total_test_runs}</td></tr>
+                    <tr><td><strong>NATS Port</strong></td><td>${status.nats_port}</td></tr>
+                    <tr><td><strong>HTTP Port</strong></td><td>${status.http_port}</td></tr>
+                </table>
+            `;
+
+            // Show current test run if active
+            if (status.current_test_run) {
+                document.getElementById('current-test').innerHTML = `
+                    <p><strong>Name:</strong> ${status.current_test_run.name}</p>
+                    <p><strong>Status:</strong> <span class="status status-${status.current_test_run.status}">${status.current_test_run.status}</span></p>
+                    <p><strong>ID:</strong> <code>${status.current_test_run.id}</code></p>
+                    <div style="margin-top: 12px;">
+                        <a href="/ui/test-runs/${status.current_test_run.id}" class="btn btn-outline">View Details</a>
+                    </div>
+                `;
+            }
+
+            // Get agents summary
+            const agents = await apiCall('/agents');
+            if (agents.agents && agents.agents.length > 0) {
+                const agentsByRegion = {};
+                agents.agents.forEach(agent => {
+                    const region = agent.region || 'unknown';
+                    if (!agentsByRegion[region]) agentsByRegion[region] = 0;
+                    agentsByRegion[region]++;
+                });
+
+                let agentsHtml = '<table class="table">';
+                Object.entries(agentsByRegion).forEach(([region, count]) => {
+                    agentsHtml += `<tr><td>${region}</td><td>${count} agents</td></tr>`;
+                });
+                agentsHtml += '</table>';
+                document.getElementById('agents-summary').innerHTML = agentsHtml;
+            } else {
+                document.getElementById('agents-summary').innerHTML = '<p>No agents connected</p>';
+            }
+
+            // Get recent test runs
+            const testRuns = await apiCall('/test-runs');
+            if (testRuns.test_runs && testRuns.test_runs.length > 0) {
+                const recent = testRuns.test_runs.slice(-5).reverse();
+                let testsHtml = '<table class="table"><tr><th>Name</th><th>Status</th><th>Created</th><th>Actions</th></tr>';
+                recent.forEach(test => {
+                    testsHtml += `
+                        <tr>
+                            <td>${test.name}</td>
+                            <td><span class="status status-${test.status}">${test.status}</span></td>
+                            <td>${formatTimestamp(test.created_at)}</td>
+                            <td><a href="/ui/test-runs/${test.id}" class="btn btn-outline">View</a></td>
+                        </tr>
+                    `;
+                });
+                testsHtml += '</table>';
+                document.getElementById('recent-tests').innerHTML = testsHtml;
+            } else {
+                document.getElementById('recent-tests').innerHTML = '<p>No test runs yet. <a href="/ui/test-runs/new">Create your first test run</a></p>';
+            }
+
+        } catch (error) {
+            console.error('Failed to refresh dashboard:', error);
+            // Show user-friendly error messages
+            document.getElementById('coordinator-status').innerHTML = '<p style="color: #666;">Unable to load coordinator status</p>';
+            document.getElementById('agents-summary').innerHTML = '<p style="color: #666;">Unable to load agents data</p>';
+            document.getElementById('recent-tests').innerHTML = '<p style="color: #666;">Unable to load test runs data</p>';
+        }
+    }
+
+    // Initial load
+    refreshData();
+</script>
+{{end}}

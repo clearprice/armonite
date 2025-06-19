@@ -1,0 +1,326 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main  # Triggers on push to main branch
+    tags:
+      - 'v*'  # Also triggers on manual version tags
+
+jobs:
+  create-tag:
+    name: Create version tag
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      new_tag: ${{ steps.tag.outputs.new_tag }}
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get next version
+        id: tag
+        run: |
+          # Get the latest tag, default to v0.0.0 if no tags exist
+          latest_tag=$(git tag -l "v*.*.*" | sort -V | tail -n1)
+          if [ -z "$latest_tag" ]; then
+            latest_tag="v0.0.0"
+          fi
+          
+          echo "Latest tag: $latest_tag"
+          
+          # Extract version numbers
+          version=${latest_tag#v}
+          IFS='.' read -r major minor patch <<< "$version"
+          
+          # Increment patch version for main branch merges
+          new_patch=$((patch + 1))
+          new_version="v${major}.${minor}.${new_patch}"
+          
+          echo "New version: $new_version"
+          echo "new_tag=$new_version" >> $GITHUB_OUTPUT
+          echo "version=$new_version" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ steps.tag.outputs.new_tag }} -m "Release ${{ steps.tag.outputs.new_tag }}"
+          git push origin ${{ steps.tag.outputs.new_tag }}
+
+  build:
+    name: Build binaries
+    runs-on: ubuntu-latest
+    needs: [create-tag]
+    if: always() && (needs.create-tag.result == 'success' || github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            goos: linux
+            goarch: amd64
+          - os: linux
+            arch: arm64
+            goos: linux
+            goarch: arm64
+          - os: darwin
+            arch: amd64
+            goos: darwin
+            goarch: amd64
+          - os: darwin
+            arch: arm64
+            goos: darwin
+            goarch: arm64
+          - os: windows
+            arch: amd64
+            goos: windows
+            goarch: amd64
+          - os: windows
+            arch: arm64
+            goos: windows
+            goarch: arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Node.js dependencies
+        run: |
+          cd ui-react
+          npm ci
+
+      - name: Build React UI
+        run: |
+          cd ui-react
+          npm run build
+
+      - name: Set binary name
+        id: binary_name
+        run: |
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            echo "binary_name=armonite.exe" >> $GITHUB_OUTPUT
+          else
+            echo "binary_name=armonite" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Go binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          # Use the created tag or fallback to git ref
+          VERSION="${{ needs.create-tag.outputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${{ github.ref_name }}"
+          fi
+          go build -ldflags="-s -w -X main.version=$VERSION" -o ${{ steps.binary_name.outputs.binary_name }}
+
+      - name: Create archive
+        id: archive
+        run: |
+          # Use the created tag or fallback to git ref
+          VERSION="${{ needs.create-tag.outputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${{ github.ref_name }}"
+          fi
+          
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            archive_name="armonite-$VERSION-${{ matrix.os }}-${{ matrix.arch }}.zip"
+            zip "$archive_name" ${{ steps.binary_name.outputs.binary_name }} README.md CONCEPTS.md CONFIG.md armonite.yaml example-testplan.yaml
+          else
+            archive_name="armonite-$VERSION-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
+            tar -czf "$archive_name" ${{ steps.binary_name.outputs.binary_name }} README.md CONCEPTS.md CONFIG.md armonite.yaml example-testplan.yaml
+          fi
+          echo "archive_name=$archive_name" >> $GITHUB_OUTPUT
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: armonite-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            ${{ steps.binary_name.outputs.binary_name }}
+            ${{ steps.archive.outputs.archive_name }}
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [create-tag, build]
+    if: always() && needs.build.result == 'success'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release notes
+        id: release_notes
+        run: |
+          # Use the created tag or fallback to git ref
+          VERSION="${{ needs.create-tag.outputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${{ github.ref_name }}"
+          fi
+          
+          cat > release_notes.md << EOF
+          ## Armonite $VERSION
+          
+          Distributed load testing platform with embedded React UI.
+          
+          ### Features
+          - 🚀 **Distributed Architecture** - Coordinate multiple agents for high-scale testing
+          - 🎯 **Advanced Ramp-up Strategies** - Linear, step, and custom phase-based load patterns
+          - 📊 **Real-time Monitoring** - Live metrics and telemetry via NATS messaging
+          - 🌐 **Embedded Web UI** - Complete React interface bundled in the binary
+          - 💾 **SQLite Storage** - Persistent test runs and results
+          - 🔧 **Development Mode** - Resource-controlled testing with rate limiting
+          - 📈 **Sequential Coordination** - Coordinated agent execution for precise testing
+          
+          ### Downloads
+          
+          Choose the appropriate binary for your platform:
+          
+          | Platform | Architecture | Download |
+          |----------|--------------|----------|
+          | Linux    | x64         | [armonite-$VERSION-linux-amd64.tar.gz] |
+          | Linux    | ARM64       | [armonite-$VERSION-linux-arm64.tar.gz] |
+          | macOS    | Intel       | [armonite-$VERSION-darwin-amd64.tar.gz] |
+          | macOS    | Apple Silicon | [armonite-$VERSION-darwin-arm64.tar.gz] |
+          | Windows  | x64         | [armonite-$VERSION-windows-amd64.zip] |
+          | Windows  | ARM64       | [armonite-$VERSION-windows-arm64.zip] |
+          
+          ### Quick Start
+          
+          ```bash
+          # Extract the archive
+          tar -xzf armonite-$VERSION-linux-amd64.tar.gz  # Linux/macOS
+          # or
+          unzip armonite-$VERSION-windows-amd64.zip      # Windows
+          
+          # Start coordinator with web UI
+          ./armonite coordinator --ui --http-port 8081
+          
+          # Start agent (in another terminal)
+          ./armonite agent --master-host localhost --dev
+          
+          # Open browser to http://localhost:8081
+          ```
+          
+          ### What's Included
+          - `armonite` - Main binary (coordinator + agent)
+          - `README.md` - Complete documentation
+          - `CONCEPTS.md` - Architecture and concepts guide
+          - `armonite.yaml` - Configuration example
+          - `example-testplan.yaml` - Sample test plan
+          
+          ### Checksums
+          
+          See attached files for SHA256 checksums.
+          EOF
+
+      - name: Collect archives and create checksums
+        run: |
+          mkdir -p release_files
+          find artifacts -name "*.tar.gz" -o -name "*.zip" | while read file; do
+            cp "$file" release_files/
+          done
+          
+          # Copy documentation files
+          cp README.md CONCEPTS.md CONFIG.md release_files/
+          
+          cd release_files
+          sha256sum *.tar.gz *.zip > checksums.txt
+          ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.create-tag.outputs.version || github.ref_name }}
+          name: Armonite ${{ needs.create-tag.outputs.version || github.ref_name }}
+          body_path: release_notes.md
+          files: |
+            release_files/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+    needs: [create-tag, build]
+    if: always() && needs.build.result == 'success'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Node.js dependencies
+        run: |
+          cd ui-react
+          npm ci
+
+      - name: Build React UI
+        run: |
+          cd ui-react
+          npm run build
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.create-tag.outputs.version || github.ref_name }}

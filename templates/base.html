@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Armonite - {{.Title}}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            line-height: 1.6;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Side Navigation */
+        .sidebar {
+            width: 240px;
+            background-color: #000000;
+            color: #ffffff;
+            padding: 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        .sidebar-header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .sidebar-nav {
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            display: block;
+            padding: 12px 20px;
+            color: #ffffff;
+            text-decoration: none;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .nav-item:hover {
+            background-color: #333333;
+        }
+
+        .nav-item.active {
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        .nav-item .icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            vertical-align: middle;
+            stroke: currentColor;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 240px;
+            padding: 30px;
+            background-color: #ffffff;
+        }
+
+        .header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #666666;
+            font-size: 16px;
+        }
+
+        /* Cards */
+        .card {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #000000;
+            color: #ffffff;
+            text-decoration: none;
+            border: 1px solid #000000;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #333333;
+        }
+
+        .btn-outline {
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        .btn-outline:hover {
+            background-color: #000000;
+            color: #ffffff;
+        }
+
+        /* Tables */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        .table th,
+        .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .table th {
+            font-weight: 600;
+            background-color: #f5f5f5;
+        }
+
+        /* Status badges */
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-running {
+            background-color: #000000;
+            color: #ffffff;
+        }
+
+        .status-waiting {
+            background-color: #f0f0f0;
+            color: #666666;
+        }
+
+        .status-completed {
+            background-color: #f0f0f0;
+            color: #000000;
+        }
+
+        .status-failed {
+            background-color: #000000;
+            color: #ffffff;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #000000;
+        }
+
+        /* JSON/Code display */
+        .code {
+            background-color: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 16px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 200px;
+            }
+            .main-content {
+                margin-left: 200px;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>Armonite</h1>
+            </div>
+            <div class="sidebar-nav">
+                <a href="/ui" class="nav-item {{if eq .Page "dashboard"}}active{{end}}">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Dashboard
+                </a>
+                <a href="/ui/agents" class="nav-item {{if eq .Page "agents"}}active{{end}}">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    Agents
+                </a>
+                <a href="/ui/test-runs" class="nav-item {{if eq .Page "test-runs"}}active{{end}}">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polygon points="10,8 16,12 10,16 10,8"></polygon>
+                    </svg>
+                    Test Runs
+                </a>
+                <a href="/ui/results" class="nav-item {{if eq .Page "results"}}active{{end}}">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    Results
+                </a>
+                <a href="/ui/settings" class="nav-item {{if eq .Page "settings"}}active{{end}}">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="m12 1 1.27 1.27a9.96 9.96 0 0 1 2.46.37l1.84-.76.76 1.84a9.96 9.96 0 0 1 .37 2.46L20.17 7l.83 1-.83 1-1.47 1.27a9.96 9.96 0 0 1-.37 2.46l.76 1.84-1.84.76a9.96 9.96 0 0 1-2.46.37L13.73 17 12 17l-1.27-1.27a9.96 9.96 0 0 1-2.46-.37l-1.84.76-.76-1.84a9.96 9.96 0 0 1-.37-2.46L3.83 11 3 10l.83-1 1.47-1.27a9.96 9.96 0 0 1 .37-2.46L4.9 3.43l1.84-.76a9.96 9.96 0 0 1 2.46-.37L10.27 1 12 1z"></path>
+                    </svg>
+                    Settings
+                </a>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            {{if eq .Page "dashboard"}}
+                {{template "dashboard-content" .}}
+            {{else if eq .Page "agents"}}
+                {{template "agents-content" .}}
+            {{else if eq .Page "test-runs"}}
+                {{template "test-runs-content" .}}
+            {{else if eq .Page "results"}}
+                {{template "results-content" .}}
+            {{else if eq .Page "settings"}}
+                {{template "settings-content" .}}
+            {{else}}
+                {{template "content" .}}
+            {{end}}
+        </main>
+    </div>
+
+    <script>
+        // Auto-refresh data every 5 seconds
+        setInterval(() => {
+            if (typeof refreshData === 'function') {
+                refreshData();
+            }
+        }, 5000);
+
+        // Utility functions
+        function formatDuration(seconds) {
+            if (seconds < 60) return seconds + 's';
+            if (seconds < 3600) return Math.round(seconds / 60) + 'm';
+            return Math.round(seconds / 3600) + 'h';
+        }
+
+        function formatTimestamp(timestamp) {
+            return new Date(timestamp).toLocaleString();
+        }
+
+        // API helper functions
+        async function apiCall(endpoint, options = {}) {
+            try {
+                // Add timeout to API calls
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+                
+                const response = await fetch('http://{{.Host}}:{{.APIPort}}/api/v1' + endpoint, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    signal: controller.signal,
+                    ...options
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timed out');
+                }
+                console.error('API call failed:', error);
+                throw error;
+            }
+        }
+    </script>
+</body>
+</html>

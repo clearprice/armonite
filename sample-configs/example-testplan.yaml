@@ -1,0 +1,21 @@
+name: Login Load Test
+duration: 2m
+concurrency: 500
+ramp_up: 30s
+
+endpoints:
+  - method: POST
+    url: https://httpbin.org/post
+    headers:
+      Content-Type: application/json
+      User-Agent: Armonite/1.0
+    body:
+      username: testuser
+      password: testpass
+      action: login
+    think_time: 100ms
+  - method: GET
+    url: https://httpbin.org/get
+    headers:
+      Authorization: Bearer fake-token
+    think_time: 50ms

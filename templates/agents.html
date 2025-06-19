@@ -1,0 +1,136 @@
+{{define "agents-content"}}
+<div class="header">
+    <h1>Agents</h1>
+    <p>Monitor and manage connected load testing agents</p>
+</div>
+
+<div class="card">
+    <h2>Agent Status</h2>
+    <div id="agents-list">
+        <p>Loading agents...</p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Connection Instructions</h2>
+    
+    <h3 style="margin-bottom: 12px; font-size: 16px;">Binary/Direct Installation</h3>
+    <p style="margin-bottom: 8px;">To connect new agents to this coordinator, run the following command:</p>
+    <div class="code">
+./armonite agent --master-host {{.Host}} --master-port {{.Port}} --concurrency 100 --region your-region
+    </div>
+    
+    <h3 style="margin: 24px 0 12px 0; font-size: 16px;">Docker</h3>
+    <p style="margin-bottom: 8px;">To run an agent using Docker:</p>
+    <div class="code">
+docker run -d --name armonite-agent \
+  armonite:latest agent \
+  --master-host {{.Host}} \
+  --master-port {{.Port}} \
+  --concurrency 100 \
+  --region your-region
+    </div>
+    
+    <p style="margin-top: 16px; color: #666; font-size: 14px;">
+        <strong>Note:</strong> Replace <code>your-region</code> with a descriptive name (e.g., us-east-1, europe, datacenter-1). 
+        Adjust <code>--concurrency</code> based on your agent's capacity.
+    </p>
+</div>
+
+<script>
+    async function refreshData() {
+        // Show loading state first
+        document.getElementById('agents-list').innerHTML = '<p>Loading agents data...</p>';
+        
+        try {
+            const agents = await apiCall('/agents');
+            
+            if (agents.agents && agents.agents.length > 0) {
+                let agentsHtml = `
+                    <table class="table">
+                        <tr>
+                            <th>Agent ID</th>
+                            <th>Region</th>
+                            <th>Concurrency</th>
+                            <th>Connected</th>
+                            <th>Last Seen</th>
+                            <th>Requests</th>
+                            <th>Errors</th>
+                            <th>Avg Latency</th>
+                            <th>Status</th>
+                        </tr>
+                `;
+                
+                agents.agents.forEach(agent => {
+                    const lastSeen = new Date(agent.last_seen);
+                    const now = new Date();
+                    const secondsAgo = Math.floor((now - lastSeen) / 1000);
+                    const isStale = secondsAgo > 60;
+                    
+                    agentsHtml += `
+                        <tr>
+                            <td><code>${agent.id}</code></td>
+                            <td>${agent.region || 'N/A'}</td>
+                            <td>${agent.concurrency}</td>
+                            <td>${formatTimestamp(agent.connected_at)}</td>
+                            <td>${formatTimestamp(agent.last_seen)}</td>
+                            <td>${agent.requests || 0}</td>
+                            <td>${agent.errors || 0}</td>
+                            <td>${agent.avg_latency_ms ? agent.avg_latency_ms.toFixed(2) + 'ms' : 'N/A'}</td>
+                            <td>
+                                <span class="status ${isStale ? 'status-failed' : 'status-running'}">
+                                    ${isStale ? 'stale' : 'connected'}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                agentsHtml += '</table>';
+                
+                // Add summary
+                const totalConcurrency = agents.agents.reduce((sum, agent) => sum + agent.concurrency, 0);
+                const totalRequests = agents.agents.reduce((sum, agent) => sum + (agent.requests || 0), 0);
+                const totalErrors = agents.agents.reduce((sum, agent) => sum + (agent.errors || 0), 0);
+                
+                agentsHtml = `
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px;">
+                        <div style="text-align: center; padding: 16px; background-color: #f5f5f5; border-radius: 4px;">
+                            <div style="font-size: 24px; font-weight: 600;">${agents.agents.length}</div>
+                            <div style="color: #666;">Total Agents</div>
+                        </div>
+                        <div style="text-align: center; padding: 16px; background-color: #f5f5f5; border-radius: 4px;">
+                            <div style="font-size: 24px; font-weight: 600;">${totalConcurrency}</div>
+                            <div style="color: #666;">Total Concurrency</div>
+                        </div>
+                        <div style="text-align: center; padding: 16px; background-color: #f5f5f5; border-radius: 4px;">
+                            <div style="font-size: 24px; font-weight: 600;">${totalRequests.toLocaleString()}</div>
+                            <div style="color: #666;">Total Requests</div>
+                        </div>
+                        <div style="text-align: center; padding: 16px; background-color: #f5f5f5; border-radius: 4px;">
+                            <div style="font-size: 24px; font-weight: 600;">${totalErrors.toLocaleString()}</div>
+                            <div style="color: #666;">Total Errors</div>
+                        </div>
+                    </div>
+                ` + agentsHtml;
+                
+                document.getElementById('agents-list').innerHTML = agentsHtml;
+            } else {
+                document.getElementById('agents-list').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <p style="font-size: 18px; margin-bottom: 16px;">No agents connected</p>
+                        <p>Start agents using the command below to begin load testing.</p>
+                    </div>
+                `;
+            }
+            
+        } catch (error) {
+            console.error('Failed to refresh agents:', error);
+            document.getElementById('agents-list').innerHTML = '<p style="color: #666;">Unable to load agents data</p>';
+        }
+    }
+
+    // Initial load
+    refreshData();
+</script>
+{{end}}

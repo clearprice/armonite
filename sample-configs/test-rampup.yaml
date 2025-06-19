@@ -1,0 +1,11 @@
+name: "API Load Test with Linear Ramp-up"
+duration: "2m"
+concurrency: 100
+ramp_up_strategy:
+  type: "linear"
+  duration: "30s"
+endpoints:
+  - method: "GET"
+    url: "https://httpbin.org/delay/1"
+    headers:
+      Content-Type: "application/json"
