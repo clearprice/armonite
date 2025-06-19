@@ -146,10 +146,10 @@ jobs:
           
           if [ "${{ matrix.goos }}" = "windows" ]; then
             archive_name="armonite-$VERSION-${{ matrix.os }}-${{ matrix.arch }}.zip"
-            zip "$archive_name" ${{ steps.binary_name.outputs.binary_name }} README.md CONCEPTS.md CONFIG.md armonite.yaml example-testplan.yaml
+            zip "$archive_name" ${{ steps.binary_name.outputs.binary_name }} README.md CONCEPTS.md CONFIG.md sample-configs/armonite.yaml sample-configs/example-testplan.yaml
           else
             archive_name="armonite-$VERSION-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
-            tar -czf "$archive_name" ${{ steps.binary_name.outputs.binary_name }} README.md CONCEPTS.md CONFIG.md armonite.yaml example-testplan.yaml
+            tar -czf "$archive_name" ${{ steps.binary_name.outputs.binary_name }} README.md CONCEPTS.md CONFIG.md sample-configs/armonite.yaml sample-configs/example-testplan.yaml
           fi
           echo "archive_name=$archive_name" >> $GITHUB_OUTPUT
 
